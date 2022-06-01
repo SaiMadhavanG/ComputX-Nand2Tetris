@@ -1,0 +1,88 @@
+// Project for computX by Sai Madhavan G IMT2021101
+
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+    // Put your code here:
+    // Determining what type of instruction it is
+    Or(a=instruction[15], b=false, out=Ctype);
+    Xor(a=instruction[15], b=true, out=Atype);
+
+    // Configuring inputs for ALU
+    Or(a=instruction[11], b=false, out=zx);
+    Or(a=instruction[10], b=false, out=nx);
+    Or(a=instruction[9], b=false, out=zy);
+    Or(a=instruction[8], b=false, out=ny);
+    Or(a=instruction[7], b=false, out=f);
+    Or(a=instruction[6], b=false, out=no);
+
+    // Checking if input of ALU is from memory or A 
+    Or(a=instruction[12], b=false, out=whichInput);
+
+    // Giving ALU input accordingly
+    Mux16(a=outA, b=inM, sel=whichInput, out=ALUInput);
+    ALU(x=outD, y=ALUInput, zx=zx, nx=nx, zy=zy, ny=ny, f=f, no=no, zr=zr, ng=ng, out=outALU);
+
+
+    // Checking which registers/memory to write in
+    And(a=instruction[5], b=Ctype, out=writeA);
+    And(a=instruction[4], b=Ctype, out=writeD);
+    And(a=instruction[3], b=Ctype, out=writeM);
+
+    // Checking whether to write in A and writing apprpriate value
+    Or(a=Atype, b=writeA, out=mustWriteA);
+    Mux16(a=outALU, b=instruction, sel=Atype, out=inputA);
+    ARegister(in=inputA, load=mustWriteA, out=outA);
+
+    // Writing in D register
+    DRegister(in=outALU, load=writeD, out=outD);
+
+    // Assigning output of ALU as outM
+    Or16(a=outALU, b=false, out=outM);
+
+    // Calculating the different conditions for jump instructions
+    // No jump
+    Not (in=true, out=nojmp);
+    // is Positive
+    Not (in=jle, out=jgt);
+    // is equal to Zero
+    And (a=true, b=zr, out=jeq);
+    // is greater than or equal to Zero
+    Or (a=zr, b=jgt, out=jge);
+    // is Negative
+    And (a=true, b=ng, out=jlt);
+    // is not equal to Zero
+    Not (in=zr, out=jne);
+    // is less than or equal to Zero
+    Or (a=zr, b=ng, out=jle);
+    // Unconnditional Jump
+    Not (in=false, out=jmp);
+
+    // Jump control
+    Mux(a=nojmp, b=jgt, sel=instruction[0], out=mux1out);
+    Mux(a=jeq, b=jge, sel=instruction[0], out=mux2out);
+    Mux(a=jlt, b=jne, sel=instruction[0], out=mux3out);
+    Mux(a=jle, b=jmp, sel=instruction[0], out=mux4out);
+    Mux(a=mux1out, b=mux2out, sel=instruction[1], out=mux5out);
+    Mux(a=mux3out, b=mux4out, sel=instruction[1], out=mux6out);
+    Mux(a=mux5out, b=mux6out, sel=instruction[2], out=jumpCont);
+
+    And(a=Ctype, b=jumpCont, out=mustJump);
+
+    // Calculate PC
+    PC(in=outA, load=mustJump, inc=true, reset=reset, out[0..14]=pc);
+
+    // Setting addressM
+    Or16(a=outA, b=false, out[0..14]=addressM);
+}

@@ -1,0 +1,12 @@
+// Project for computX by Sai Madhavan G IMT2021101
+
+CHIP Computer {
+
+    IN reset;
+
+    PARTS:
+    // Put your code here:
+    Memory(in=outMemory ,load=writeM ,address=addressM ,out=inMemory);
+    ROM32K (address=pc, out=instruction);
+    CPU (reset=reset, instruction=instruction, inM=inMemory, addressM=addressM, writeM=writeM, outM=outMemory, pc=pc);
+}
